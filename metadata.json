@@ -1,0 +1,17 @@
+{
+  "name": "4x5 Image Editor",
+  "description": "Edit, sign, and annotate PDF documents and images online for free. Our browser-based editor is private, secure, and requires no uploads. Also features an image converter and QR code generator.Always assign a new version number to the program whenever an update is made.\n",
+  "keywords": [
+    "pdf editor",
+    "edit pdf",
+    "sign pdf",
+    "annotate pdf",
+    "fill pdf form",
+    "image editor",
+    "online editor",
+    "free pdf editor",
+    "image converter",
+    "qr code generator"
+  ],
+  "requestFramePermissions": []
+}

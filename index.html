@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO Meta Tags will be dynamically updated by React -->
+    <title id="meta-title">PDF & Image Editor | Free Online Tool to Sign & Edit Documents</title>
+    <meta id="meta-description" name="description" content="Edit, sign, and annotate PDF documents and images online for free. Our browser-based editor is private, secure, and requires no uploads. Also features an image converter and QR code generator." />
+    <meta id="meta-keywords" name="keywords" content="pdf editor, edit pdf, sign pdf, annotate pdf, fill pdf form, image editor, online editor, free pdf editor" />
+    <meta name="author" content="apsardze24.lv" />
+    <meta name="robots" content="index, follow" />
+    <link id="meta-canonical" rel="canonical" href="https://pdf.5plus.lv/" />
+
+    <!-- Favicon and App Icons -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta id="meta-og-url" property="og:url" content="https://pdf.5plus.lv/" />
+    <meta id="meta-og-title" property="og:title" content="PDF & Image Editor | Free Online Tool to Sign & Edit Documents" />
+    <meta id="meta-og-description" property="og:description" content="The Private, All-in-One Tool to Edit PDFs & Images Online. Sign documents, fill forms, convert files, and create QR codes securely in your browser." />
+    <meta property="og:image" content="https://pdf.5plus.lv/android-chrome-512x512.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta id="meta-twitter-url" property="twitter:url" content="https://pdf.5plus.lv/" />
+    <meta id="meta-twitter-title" property="twitter:title" content="PDF & Image Editor | Free Online Tool to Sign & Edit Documents" />
+    <meta id="meta-twitter-description" property="twitter:description" content="The Private, All-in-One Tool to Edit PDFs & Images Online. Sign documents, fill forms, convert files, and create QR codes securely in your browser." />
+    <meta property="twitter:image" content="https://pdf.5plus.lv/android-chrome-512x512.png" />
+
+    <!-- Other Meta -->
+    <meta name="theme-color" content="#c41b1b">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Russo+One&family=Special+Elite&family=Staatliches&display=swap" rel="stylesheet">
+
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip for creating .zip files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- FileSaver.js for saving files locally -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- pdf.js for PDF rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- jsPDF for PDF creation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- qr-code-styling for QR code generation -->
+    <script src="https://unpkg.com/qr-code-styling@1.6.0/lib/qr-code-styling.js"></script>
+    <!-- Fabric.js for image editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
+    <script>
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+    <style>
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.2s ease-out forwards;
+        }
+        /* Custom Range Slider Styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #334155; /* slate-700 */
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.9;
+            transition: opacity .2s;
+        }
+        input[type="range"]:hover {
+            opacity: 1;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #ffffff; /* white */
+            border: 2px solid #475569; /* slate-600 */
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border: 2px solid #475569;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]:disabled::-webkit-slider-thumb {
+            background-color: #64748b; /* slate-500 */
+            border-color: #475569; /* slate-600 */
+            cursor: not-allowed;
+        }
+        input[type="range"]:disabled::-moz-range-thumb {
+            background-color: #64748b;
+            border-color: #475569;
+            cursor: not-allowed;
+        }
+
+        /* Custom Tooltip Styles */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(8px);
+            background-color: #1e293b; /* slate-800 */
+            color: #e2e8f0; /* slate-200 */
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+            z-index: 10;
+        }
+        [data-tooltip]:hover::after {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+    </style>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-blue': '#4285F4',
+              'brand-green': '#34A853',
+              'brand-yellow': '#FBBC05',
+              'brand-red': '#EA4335',
+              'slate': {
+                850: '#172033'
+              },
+            },
+          },
+        },
+      }
+    </script>
+    <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
+  }
+}
+</script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-F6FRS4M708"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+
+      // Default consent mode is 'denied' before user interaction for Consent Mode v2
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied'
+      });
+
+      gtag('js', new Date());
+      gtag('config', 'G-F6FRS4M708');
+      gtag('config', 'G-LHT5NWJ2FH');
+    </script>
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json" id="meta-ld-json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "PDF & Image Editor",
+    "description": "Edit, sign, and annotate PDF documents and images online for free. Our browser-based editor is private, secure, and requires no uploads.",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "url": "https://pdf.5plus.lv/",
+    "keywords": "pdf editor, edit pdf, sign pdf, annotate pdf, fill pdf form, image editor, online editor, free pdf editor",
+    "author": {
+      "@type": "Organization",
+      "name": "apsardze24.lv",
+      "url": "https://apsardze24.lv"
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://pdf.5plus.lv/"
+    }
+  }
+  </script>
+</head>
+  <body class="bg-slate-900 text-gray-200 font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
