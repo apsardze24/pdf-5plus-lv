@@ -566,7 +566,7 @@ const App: React.FC = () => {
                   {t.developedBy}{' '}
                   <a href="https://apsardze24.lv" target="_blank" rel="noopener noreferrer" className="font-semibold text-red-700 hover:text-red-600 transition-colors">apsardze24.lv</a>
                 </p>
-                <p className="text-xs mt-1">v3.4.7 &copy; {new Date().getFullYear()}</p>
+                <p className="text-xs mt-1">v3.4.8 &copy; {new Date().getFullYear()}</p>
             </div>
          </div>
       </footer>
