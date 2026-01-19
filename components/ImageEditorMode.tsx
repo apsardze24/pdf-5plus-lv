@@ -988,7 +988,10 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
 
         // As per the UI hint, find a single text object to use as a watermark
         // FIX: Explicitly cast the objects and use any for the search predicate to avoid 'unknown' errors.
-        const watermarkObject = (fabricCanvas.getObjects() as any[]).find((obj: any) => (obj as any).type === 'i-text');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const canvasObjects = fabricCanvas.getObjects() as any[];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const watermarkObject = canvasObjects.find((obj: any) => obj.type === 'i-text');
         
         if (!watermarkObject) {
             alert(t.batch_watermark_info);
@@ -1011,7 +1014,9 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
                     const tempCanvasEl = document.createElement('canvas');
                     const tempFabricCanvas = new fabric.Canvas(tempCanvasEl, { renderOnAddRemove: false });
 
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const img = await new Promise<any>((resolve, reject) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         fabric.Image.fromURL(dataUrl, (fabricImage: any) => {
                             if (fabricImage) resolve(fabricImage);
                             else reject(new Error('Failed to load image for zipping.'));
@@ -1023,6 +1028,7 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
                     tempFabricCanvas.setBackgroundImage(img, tempFabricCanvas.renderAll.bind(tempFabricCanvas));
                     
                     await new Promise<void>(resolve => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         watermarkObject.clone((cloned: any) => {
                             tempFabricCanvas.add(cloned);
                             cloned.center();
@@ -1045,8 +1051,8 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
             }
             
             // FIX: Await the zip generation and cast the result directly in the saveAs call to ensure correct type resolution.
-            const content = await zip.generateAsync({ type: 'blob' });
-            saveAs(content as any, 'watermarked-images.zip');
+            const content = await zip.generateAsync({ type: 'blob' }) as Blob;
+            saveAs(content, 'watermarked-images.zip');
 
         } catch (error) {
             console.error('Batch processing failed:', error);
@@ -1315,4 +1321,3 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
 };
 
 export default ImageEditorMode;
-

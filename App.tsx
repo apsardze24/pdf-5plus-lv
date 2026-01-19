@@ -127,13 +127,15 @@ const App: React.FC = () => {
             setIsLoadedFromUrl(true);
             urlChanged = true;
             try {
-                // Используем более стабильный прокси AllOrigins
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
+                // Use corsproxy.io for better reliability with binary image data
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
                 const response = await fetch(proxyUrl);
                 if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
                 
                 const blob = await response.blob();
-                const filename = imageUrl.substring(imageUrl.lastIndexOf('/') + 1).split('?')[0] || 'remote-image.jpg';
+                // Try to infer filename from URL, remove query params
+                const cleanUrl = imageUrl.split('?')[0];
+                const filename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'remote-image.jpg';
                 const file = new File([blob], filename, { type: blob.type });
                 
                 handleImageUpload([file], true);
@@ -566,7 +568,7 @@ const App: React.FC = () => {
                   {t.developedBy}{' '}
                   <a href="https://apsardze24.lv" target="_blank" rel="noopener noreferrer" className="font-semibold text-red-700 hover:text-red-600 transition-colors">apsardze24.lv</a>
                 </p>
-                <p className="text-xs mt-1">v3.4.8 &copy; {new Date().getFullYear()}</p>
+                <p className="text-xs mt-1">v3.4.9 &copy; {new Date().getFullYear()}</p>
             </div>
          </div>
       </footer>
