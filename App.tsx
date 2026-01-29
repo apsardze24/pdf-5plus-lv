@@ -127,8 +127,11 @@ const App: React.FC = () => {
             setIsLoadedFromUrl(true);
             urlChanged = true;
             try {
-                // Use corsproxy.io for better reliability with binary image data
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
+                // Use corsproxy.io with cache busting for better reliability
+                const cacheBuster = `t=${Date.now()}`;
+                const urlWithCacheBuster = imageUrl.includes('?') ? `${imageUrl}&${cacheBuster}` : `${imageUrl}?${cacheBuster}`;
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(urlWithCacheBuster)}`;
+                
                 const response = await fetch(proxyUrl);
                 if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
                 
@@ -568,7 +571,7 @@ const App: React.FC = () => {
                   {t.developedBy}{' '}
                   <a href="https://apsardze24.lv" target="_blank" rel="noopener noreferrer" className="font-semibold text-red-700 hover:text-red-600 transition-colors">apsardze24.lv</a>
                 </p>
-                <p className="text-xs mt-1">v3.4.9 &copy; {new Date().getFullYear()}</p>
+                <p className="text-xs mt-1">v3.5.0 &copy; {new Date().getFullYear()}</p>
             </div>
          </div>
       </footer>

@@ -987,11 +987,10 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
         if (!fabricCanvas) return;
 
         // As per the UI hint, find a single text object to use as a watermark
-        // FIX: Explicitly cast the objects and use any for the search predicate to avoid 'unknown' errors.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // FIX: Explicitly cast to any[] and use safe access for find predicate
         const canvasObjects = fabricCanvas.getObjects() as any[];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const watermarkObject = canvasObjects.find((obj: any) => obj.type === 'i-text');
+        const watermarkObject = canvasObjects.find((obj: any) => obj && obj.type === 'i-text');
         
         if (!watermarkObject) {
             alert(t.batch_watermark_info);
@@ -999,7 +998,8 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
         }
         
         setIsProcessingZip(true);
-        const zip = new JSZip();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const zip = new (JSZip as any)();
 
         try {
             for (const file of imageFiles) {
@@ -1037,7 +1037,10 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
                         });
                     });
                     
-                    const blob: Blob | null = await new Promise<Blob | null>(resolve => tempCanvasEl.toBlob(resolve, 'image/png'));
+                    // FIX: Use explicit callback wrapper for toBlob to avoid type mismatch
+                    const blob = await new Promise<Blob | null>(resolve => {
+                        tempCanvasEl.toBlob((b) => resolve(b), 'image/png');
+                    });
 
                     if (blob) {
                         const baseFilename = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
@@ -1050,8 +1053,8 @@ const ImageEditorMode: React.FC<ImageEditorModeProps> = ({ imageFiles, onNewImag
                 }
             }
             
-            // FIX: Await the zip generation and cast the result directly in the saveAs call to ensure correct type resolution.
-            const content = await zip.generateAsync({ type: 'blob' }) as Blob;
+            // FIX: Double cast via unknown to Blob to satisfy TypeScript if inference fails
+            const content = (await zip.generateAsync({ type: 'blob' })) as unknown as Blob;
             saveAs(content, 'watermarked-images.zip');
 
         } catch (error) {
