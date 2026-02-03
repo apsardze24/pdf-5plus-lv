@@ -105,7 +105,45 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Robust URL processing with Proxy Fallback
+  // --- EXTENSION DIRECT INJECTION LISTENER ---
+  useEffect(() => {
+      const handleExtensionMessage = async (event: MessageEvent) => {
+          // Verify source if needed, currently accepting internal messages
+          if (event.data && event.data.type === 'EXTENSION_IMAGE_DATA') {
+              const { base64Data, mimeType, filename, targetMode } = event.data;
+              
+              if (!base64Data) return;
+
+              setIsUrlLoading(true);
+              try {
+                  // Convert Base64 to File
+                  const res = await fetch(base64Data);
+                  const blob = await res.blob();
+                  const file = new File([blob], filename || 'pasted-image.png', { type: mimeType || blob.type });
+                  
+                  handleImageUpload([file], true);
+                  
+                  if (targetMode && ['generator', 'converter', 'qrGenerator', 'editor'].includes(targetMode)) {
+                      setMode(targetMode as AppMode);
+                  }
+                  
+                  // Clean URL if needed
+                  window.history.replaceState({}, document.title, window.location.pathname);
+              } catch (e) {
+                  console.error("Failed to process extension image:", e);
+                  setLastError("Failed to process image sent from extension.");
+              } finally {
+                  setIsUrlLoading(false);
+              }
+          }
+      };
+
+      window.addEventListener('message', handleExtensionMessage);
+      return () => window.removeEventListener('message', handleExtensionMessage);
+  }, [handleImageUpload]);
+
+
+  // Robust URL processing with Proxy Fallback (Legacy method)
   useEffect(() => {
     const processUrlParams = async () => {
         if (initialProcessingRef.current) return;
@@ -114,75 +152,82 @@ const App: React.FC = () => {
         const imageUrl = params.get('image');
         const urlMode = params.get('mode') as AppMode;
 
-        if (!imageUrl && !urlMode) return;
+        // If no image, but mode is set, just switch mode
+        if (urlMode && ['generator', 'converter', 'qrGenerator', 'editor'].includes(urlMode)) {
+            setMode(urlMode);
+        }
+
+        if (!imageUrl) return;
         
         initialProcessingRef.current = true;
         let urlChanged = false;
 
-        // Set mode if provided
-        if (urlMode && ['generator', 'converter', 'qrGenerator', 'editor'].includes(urlMode)) {
-            setMode(urlMode);
-            urlChanged = true;
-        }
+        setIsUrlLoading(true);
+        setIsLoadedFromUrl(true);
+        urlChanged = true;
+        
+        // List of proxies to try in order
+        const proxyGenerators = [
+            // 1. Try Primary Proxy (CORS Proxy)
+            (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+            // 2. Try AllOrigins (Returns JSON or Raw)
+            (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            // 3. Try CodeTabs (Reliable for images)
+            (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+            // 4. Try Direct (In case the server actually allows CORS)
+            (url: string) => url
+        ];
 
-        if (imageUrl) {
-            setIsUrlLoading(true);
-            setIsLoadedFromUrl(true);
-            urlChanged = true;
-            
-            // Helper to try fetching
-            const tryFetch = async (url: string) => {
-                const response = await fetch(url, {
-                    referrerPolicy: 'no-referrer', // Important for privacy and some hotlink protections
-                    mode: 'cors'
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.blob();
-            };
+        let blob: Blob | null = null;
+        let success = false;
 
+        for (const generateProxyUrl of proxyGenerators) {
             try {
-                let blob: Blob | null = null;
+                const fetchUrl = generateProxyUrl(imageUrl);
                 
-                // Strategy 1: CORS Proxy IO (Fastest)
-                try {
-                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
-                    blob = await tryFetch(proxyUrl);
-                } catch (e) {
-                    console.warn("Primary proxy failed, trying fallback...", e);
-                    // Strategy 2: AllOrigins (Fallback)
-                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
-                    blob = await tryFetch(proxyUrl);
-                }
+                const response = await fetch(fetchUrl, {
+                    method: 'GET',
+                    credentials: 'omit', 
+                });
 
-                if (blob) {
-                    // Try to infer filename from URL, remove query params
-                    const cleanUrl = imageUrl.split('?')[0];
-                    const filename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'remote-image.jpg';
-                    // Ensure output type is valid image type if blob type is generic
-                    const type = blob.type === 'application/octet-stream' ? 'image/jpeg' : blob.type;
-                    
-                    const file = new File([blob], filename, { type: type });
-                    
-                    if (file.size === 0) throw new Error("Received empty file");
-
-                    handleImageUpload([file], true);
-                    
-                    if (!urlMode) {
-                        setMode('converter');
+                if (response.ok) {
+                    blob = await response.blob();
+                    if (blob.size > 0 && (blob.type.startsWith('image/') || blob.type === 'application/pdf')) {
+                        success = true;
+                        break; // Stop loop if successful
                     }
                 }
-            } catch (error) {
-                console.error("Error loading image from URL:", error);
-                const errorMessage = error instanceof Error ? error.message : "Unknown error";
-                setLastError(`Failed to load image from external URL.\nDetails: ${errorMessage}\n\nTry downloading the image and uploading it manually.`);
-                setIsLoadedFromUrl(false);
-            } finally {
-                setIsUrlLoading(false);
+            } catch (e) {
+                // Continue to next proxy
+                continue;
             }
         }
+
+        if (success && blob) {
+            const cleanUrl = imageUrl.split('?')[0];
+            let filename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'remote-image';
+            if (!filename.includes('.')) {
+                filename += '.' + (blob.type.split('/')[1] || 'jpg');
+            }
+            
+            const finalType = blob.type === 'application/octet-stream' || blob.type === 'text/plain' 
+                ? 'image/jpeg' 
+                : blob.type;
+
+            const file = new File([blob], filename, { type: finalType });
+            
+            handleImageUpload([file], true);
+            
+            if (!urlMode) {
+                setMode('converter');
+            }
+        } else {
+            setLastError(`Failed to load image. The remote server (${new URL(imageUrl).hostname}) blocked all access attempts.\n\nSolution: Please download the image to your computer first, then upload it here.`);
+            setIsLoadedFromUrl(false);
+        }
+        setIsUrlLoading(false);
         
         if (urlChanged) {
-            // Clean URL bar
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     };
