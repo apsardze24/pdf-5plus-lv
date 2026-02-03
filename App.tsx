@@ -108,7 +108,7 @@ const App: React.FC = () => {
   // --- EXTENSION DIRECT INJECTION LISTENER ---
   useEffect(() => {
       const handleExtensionMessage = async (event: MessageEvent) => {
-          // Verify source if needed, currently accepting internal messages
+          // Verify message structure
           if (event.data && event.data.type === 'EXTENSION_IMAGE_DATA') {
               const { base64Data, mimeType, filename, targetMode } = event.data;
               
@@ -116,18 +116,23 @@ const App: React.FC = () => {
 
               setIsUrlLoading(true);
               try {
-                  // Convert Base64 to File
+                  // Fetch the data URI (this is local and fast, no CORS)
                   const res = await fetch(base64Data);
                   const blob = await res.blob();
-                  const file = new File([blob], filename || 'pasted-image.png', { type: mimeType || blob.type });
                   
-                  handleImageUpload([file], true);
+                  // Default filename if missing
+                  const finalFilename = filename || `imported-image-${Date.now()}.${mimeType?.split('/')[1] || 'png'}`;
                   
+                  const file = new File([blob], finalFilename, { type: mimeType || blob.type });
+                  
+                  // Switch mode first if needed
                   if (targetMode && ['generator', 'converter', 'qrGenerator', 'editor'].includes(targetMode)) {
                       setMode(targetMode as AppMode);
                   }
+
+                  handleImageUpload([file], true);
                   
-                  // Clean URL if needed
+                  // Clean URL if we somehow had params
                   window.history.replaceState({}, document.title, window.location.pathname);
               } catch (e) {
                   console.error("Failed to process extension image:", e);
@@ -143,7 +148,7 @@ const App: React.FC = () => {
   }, [handleImageUpload]);
 
 
-  // Robust URL processing with Proxy Fallback (Legacy method)
+  // Robust URL processing with Proxy Fallback (Legacy method for shared links)
   useEffect(() => {
     const processUrlParams = async () => {
         if (initialProcessingRef.current) return;
@@ -222,7 +227,7 @@ const App: React.FC = () => {
                 setMode('converter');
             }
         } else {
-            setLastError(`Failed to load image. The remote server (${new URL(imageUrl).hostname}) blocked all access attempts.\n\nSolution: Please download the image to your computer first, then upload it here.`);
+            setLastError(`Failed to load image via URL parameters.\n\nTip: Use the Chrome Extension for reliable one-click editing from any website.`);
             setIsLoadedFromUrl(false);
         }
         setIsUrlLoading(false);
@@ -561,7 +566,7 @@ const App: React.FC = () => {
       {isUrlLoading && (
         <div className="fixed inset-0 bg-slate-900/80 z-[200] flex flex-col items-center justify-center backdrop-blur-sm">
             <div className="animate-spin rounded-full h-20 w-20 border-b-4 border-blue-400"></div>
-            <p className="mt-6 text-xl text-slate-300">Loading image from URL...</p>
+            <p className="mt-6 text-xl text-slate-300">Processing image...</p>
         </div>
       )}
 
