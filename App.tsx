@@ -19,6 +19,7 @@ import ImageEditorMode from './components/ImageEditorMode';
 import FeedbackModal from './components/FeedbackModal';
 import { ShareIcon } from './components/icons/ShareIcon';
 import ChromeExtensionButton from './components/ChromeExtensionButton';
+import { APP_VERSION } from './constants/version';
 
 interface ImageInfo {
   bounds: { x: number; y: number; width: number; height: number; };
@@ -104,6 +105,7 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Robust URL processing with Proxy Fallback
   useEffect(() => {
     const processUrlParams = async () => {
         if (initialProcessingRef.current) return;
@@ -117,6 +119,7 @@ const App: React.FC = () => {
         initialProcessingRef.current = true;
         let urlChanged = false;
 
+        // Set mode if provided
         if (urlMode && ['generator', 'converter', 'qrGenerator', 'editor'].includes(urlMode)) {
             setMode(urlMode);
             urlChanged = true;
@@ -126,28 +129,52 @@ const App: React.FC = () => {
             setIsUrlLoading(true);
             setIsLoadedFromUrl(true);
             urlChanged = true;
+            
+            // Helper to try fetching
+            const tryFetch = async (url: string) => {
+                const response = await fetch(url, {
+                    referrerPolicy: 'no-referrer', // Important for privacy and some hotlink protections
+                    mode: 'cors'
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.blob();
+            };
+
             try {
-                // Use corsproxy.io with cache busting for better reliability
-                const cacheBuster = `t=${Date.now()}`;
-                const urlWithCacheBuster = imageUrl.includes('?') ? `${imageUrl}&${cacheBuster}` : `${imageUrl}?${cacheBuster}`;
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(urlWithCacheBuster)}`;
+                let blob: Blob | null = null;
                 
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
-                
-                const blob = await response.blob();
-                // Try to infer filename from URL, remove query params
-                const cleanUrl = imageUrl.split('?')[0];
-                const filename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'remote-image.jpg';
-                const file = new File([blob], filename, { type: blob.type });
-                
-                handleImageUpload([file], true);
-                
-                if (!urlMode) {
-                    setMode('converter');
+                // Strategy 1: CORS Proxy IO (Fastest)
+                try {
+                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
+                    blob = await tryFetch(proxyUrl);
+                } catch (e) {
+                    console.warn("Primary proxy failed, trying fallback...", e);
+                    // Strategy 2: AllOrigins (Fallback)
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
+                    blob = await tryFetch(proxyUrl);
+                }
+
+                if (blob) {
+                    // Try to infer filename from URL, remove query params
+                    const cleanUrl = imageUrl.split('?')[0];
+                    const filename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'remote-image.jpg';
+                    // Ensure output type is valid image type if blob type is generic
+                    const type = blob.type === 'application/octet-stream' ? 'image/jpeg' : blob.type;
+                    
+                    const file = new File([blob], filename, { type: type });
+                    
+                    if (file.size === 0) throw new Error("Received empty file");
+
+                    handleImageUpload([file], true);
+                    
+                    if (!urlMode) {
+                        setMode('converter');
+                    }
                 }
             } catch (error) {
                 console.error("Error loading image from URL:", error);
+                const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                setLastError(`Failed to load image from external URL.\nDetails: ${errorMessage}\n\nTry downloading the image and uploading it manually.`);
                 setIsLoadedFromUrl(false);
             } finally {
                 setIsUrlLoading(false);
@@ -155,6 +182,7 @@ const App: React.FC = () => {
         }
         
         if (urlChanged) {
+            // Clean URL bar
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     };
@@ -571,7 +599,7 @@ const App: React.FC = () => {
                   {t.developedBy}{' '}
                   <a href="https://apsardze24.lv" target="_blank" rel="noopener noreferrer" className="font-semibold text-red-700 hover:text-red-600 transition-colors">apsardze24.lv</a>
                 </p>
-                <p className="text-xs mt-1">v3.5.0 &copy; {new Date().getFullYear()}</p>
+                <p className="text-xs mt-1">v{APP_VERSION} &copy; {new Date().getFullYear()}</p>
             </div>
          </div>
       </footer>
@@ -579,13 +607,13 @@ const App: React.FC = () => {
       {isFeedbackModalOpen && <FeedbackModal onClose={() => setIsFeedbackModalOpen(false)} />}
       
       {lastError && (
-          <div className="fixed bottom-4 right-4 bg-red-800/90 text-white p-4 rounded-lg shadow-2xl max-w-md z-[100] animate-fade-in backdrop-blur-sm">
+          <div className="fixed bottom-4 right-4 bg-red-800/90 text-white p-4 rounded-lg shadow-2xl max-w-md z-[100] animate-fade-in backdrop-blur-sm border-l-4 border-red-500">
             <div className="flex justify-between items-start gap-4">
               <div>
-                <h4 className="font-bold mb-2">Error Log:</h4>
-                <pre className="text-xs whitespace-pre-wrap font-mono">{lastError}</pre>
+                <h4 className="font-bold mb-1 text-red-200">Something went wrong</h4>
+                <pre className="text-xs whitespace-pre-wrap font-mono text-slate-300">{lastError}</pre>
               </div>
-              <button onClick={() => setLastError(null)} className="p-1 rounded-full text-xl leading-none hover:bg-red-700 flex-shrink-0">&times;</button>
+              <button onClick={() => setLastError(null)} className="p-1 rounded-full text-xl leading-none hover:bg-slate-700 flex-shrink-0 text-slate-400 hover:text-white">&times;</button>
             </div>
           </div>
       )}
